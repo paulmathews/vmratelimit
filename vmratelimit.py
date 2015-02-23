@@ -37,7 +37,8 @@ config = ConfigParser.RawConfigParser()
 config.read('/etc/vmratelimit.conf')
 custom_rates = config.sections()
 if 'uplink' in custom_rates:
-  applyRule('int-br-ex', config.getint(uplink, 'baserate'), config.getint(uplink, 'burstrate'))
+  applyRule('int-br-ex', config.getint('uplink', 'baserate'),
+  config.getint('uplink', 'burstrate'))
 for custom in custom_rates:
   if custom in qvos:
     applyRule(custom, config.getint(custom, 'baserate'), config.getint(custom, 'burstrate'))
