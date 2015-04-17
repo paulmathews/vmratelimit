@@ -91,25 +91,31 @@ if __name__ == "__main__":
   p = subprocess.Popen(['/sbin/ip', 'link', 'show'], stdout=subprocess.PIPE)
   output = p.communicate()[0]
   qvos = re.findall('qvo\w+-\w+', output)
+  md5 = re.findall('qvo\w+-\w+', output)
   # Sort and md5 the array of current qvos, so we can easily determine if we
   # have lost or added new interfaces on the next run
   qvos.sort()
+  with open('/etc/vmratelimit.conf', 'rt') as f:
+    # add the config file to the list before hashing to detect config changes
+    qvos.append(f.read())
   cmd_md5 = hashlib.md5('\n'.join(qvos)).hexdigest()
+  # remove the config element from the list, we use this list later
+  qvos.pop()
   # If we have a file, open it, otherwise, write out the md5
   if os.path.isfile('/tmp/qvos'):
     try:
-      f = open('/tmp/qvos', 'r')
-      file_md5 = f.readline()
-      f.close
+      with open('/tmp/qvos', 'rt') as f:
+        file_md5 = f.readline()
     except:
-      file_md5 = cmd_md5
-      writeFile(cmd_md5)
-  else:
-    file_md5 = cmd_md5
-    writeFile(cmd_md5)
+      file_md5 = 0
 
+  # If md5s match, nothing has changed; exit.
+  if cmd_md5 == file_md5:
+    print "md5s match"
+    exit(0)
   # If the prior md5 and this run's md5 don't match, write out the current one
-  if cmd_md5 != file_md5:
+  else:
+    print "md5s don't match"
     writeFile(cmd_md5)
 
   config = ConfigParser.RawConfigParser()
