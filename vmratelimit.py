@@ -111,11 +111,9 @@ if __name__ == "__main__":
 
   # If md5s match, nothing has changed; exit.
   if cmd_md5 == file_md5:
-    print "md5s match"
     exit(0)
   # If the prior md5 and this run's md5 don't match, write out the current one
   else:
-    print "md5s don't match"
     writeFile(cmd_md5)
 
   config = ConfigParser.RawConfigParser()
