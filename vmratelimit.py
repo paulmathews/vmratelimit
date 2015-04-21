@@ -29,9 +29,8 @@ import sys
 def writeFile(md5):
   # /tmp/qvos contains the md5sum of the array of qvos from the previous run
   try:
-    f = open('/tmp/qvos', 'w')
-    f.write(md5)
-    f.close
+    with open('/tmp/qvos', 'w') as f:
+      f.write(md5)
   except:
     sys.stderr.write("Unable to open /tmp/qvos for writing\n")
 
