@@ -45,17 +45,45 @@ def applyRule(qvo, baserate, burstrate):
   burstcmd = ['/usr/bin/ovs-vsctl', 'set', 'interface', qvo,
          'ingress_policing_burst={0}'.format(burstrate)]
   try:
-    subprocess.call(basecmd)
+    subprocess.call(basecmd, stdout=subprocess.PIPE)
   except:
     raise Exception("Failed to set base rate on %s" % qvo)
   try:
-    subprocess.call(burstcmd)
+    subprocess.call(burstcmd, stdout=subprocess.PIPE)
   except:
     raise Exception("Failed to set burst rate on %s" % qvo)
 
 def getUplink():
   #
-  # getUplink takes no arguments, and returns the int bridge device used by
+  # getUplink takes no arguments, and returns the bridge device, or
+  # throws an exception. It first tries to get the bridge port
+  # (default in MOX 6.x), if this fails, it tries to get the veth
+  # bridge. If both fail, an exception is raised.
+  #
+  # MOX 6.x default
+  try:
+    ovs_port = get_ovs_port()
+    try:
+      bridge = verify_bridge(ovs_port)
+      return bridge
+    except:
+      pass
+  except:
+    pass
+  # If we don't get a good ovs port, check for veth
+  try:
+    veth_bridge = get_veth_bridge()
+    try:
+      bridge = verify_bridge(veth_bridge)
+      return bridge
+    except:
+      raise Exception("Unable to determine uplink")
+  except:
+    raise Exception("Unable to determine uplink")
+
+def get_veth_bridge():
+  #
+  # get_veth_bridge takes no arguments, and returns the int veth bridge used by
   # ovs. It parses plugin.ini to determine the bridge_mappings parameter, then
   # prepends 'int-' to get the int bridge.
   #
@@ -75,15 +103,42 @@ def getUplink():
         dev = bridgemap[1]
       else:
         raise Exception("Unable to find bridge mapping")
+      # prepend 'int-' to get the int bridge
+      int_dev = "int-" + dev
+      return int_dev
     except:
       raise Exception("Unable to find bridge mapping")
   # raise an exception if there is no ovs section
   else:
-      raise Exception("Unable to find an [ovs] section in "
-              "/etc/neutron/plugin.ini")
-  # prepend 'int-' to get the int bridge
-  int_dev = "int-" + dev
-  return int_dev
+    raise Exception("Unable to find an [ovs] section in "
+                    "/etc/neutron/plugin.ini")
+
+def get_ovs_port():
+  #
+  # get_ovs_port takes no arguments, and if an integration_bridge is specified
+  # in ml2_conf.ini, returns the bridge, or throws an exception
+  #
+  ml2_conf = ConfigParser.RawConfigParser()
+  ml2_conf.read('/etc/neutron/plugins/ml2/ml2_conf.ini')
+  try:
+    integration_bridge = ml2_conf.get('ovs', 'integration_bridge')
+    return integration_bridge
+  except:
+    raise Exception("No integration_bridge found")
+
+def verify_bridge(bridge):
+  #
+  # verify_bridge takes a bridge device as an argument. It checks to see if
+  # the bridge device is valid, or throws an exception
+  #
+  cmd = ['/usr/bin/ovs-vsctl', 'list', 'interface', bridge]
+  try:
+    subprocess.call(cmd, stdout=subprocess.PIPE)
+    return bridge
+  except:
+    raise Exception("Bridge device %s is not valid" % bridge)
+
+
 
 if __name__ == "__main__":
   # Get the list of qvos on the system
@@ -99,6 +154,7 @@ if __name__ == "__main__":
     qvos.append(f.read())
   cmd_md5 = hashlib.md5('\n'.join(qvos)).hexdigest()
   # remove the config element from the list, we use this list later
+  file_md5 = []
   qvos.pop()
   # If we have a file, open it, otherwise, write out the md5
   if os.path.isfile('/tmp/qvos'):
@@ -120,9 +176,9 @@ if __name__ == "__main__":
   custom_rates = config.sections()
   # Look for an [uplink] section in the config file, and apply rate
   if 'uplink' in custom_rates:
-    # Determine the bridge_mappings device
-    int_dev = getUplink()
-    applyRule(int_dev, config.getint('uplink', 'baserate'),
+    # Determine the bridge device
+    bridge = getUplink()
+    applyRule(bridge, config.getint('uplink', 'baserate'),
     config.getint('uplink', 'burstrate'))
   # Look for specified qvos in the config file, that match current ones - apply
   # the rate, and delete the qvo out of the array
