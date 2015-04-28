@@ -4,8 +4,8 @@
 # This script uses the ingress policing rates exposed on the veth interface
 # by ovs to implement rate limiting. As this is not implemented by neutron,
 # and we have no method by which to receive notifications when instances are
-# created, this is meant to be run as a periodic task. This script is intended
-# to be used as a libvirt post hook, but cron or other execution methods are
+# created, this is meant to be run periocially. This script is intended to
+# be used as a libvirt post hook, but cron or other execution methods are
 # also possible.
 #
 # To determine if new interfaces have been created since the last run, and
